@@ -9,6 +9,8 @@ A KUbuntu system tray application that watches a directory for audio and video f
 - Two processing modes: **AUTO** (immediate) and **MANUAL** (KDE notification with action button)
 - Extracts audio from video files via `ffmpeg`
 - Transcribes with `gemini-2.5-flash` via the Gemini File API
+- Optional speaker diarization (labels Speaker 1, Speaker 2, …)
+- Optional keynotes generation (participants, topic, decisions, summary)
 - Skips files that are still being written (size-stability check)
 - Tracks processed files in SQLite — no duplicate work on restart
 - Rotating log file, configurable poll interval, optional language hint
@@ -89,14 +91,19 @@ Right-click the tray icon to access the menu:
 
 Settings are stored in `~/.config/auto_transcriber/config.json`.
 
-| Field               | Default                   | Description                                                      |
-| ------------------- | ------------------------- | ---------------------------------------------------------------- |
-| `source_dir`        | `~/Videos`                | Directory to watch                                               |
-| `dest_dir`          | `~/Videos/transcripts`    | Where to save `.txt` transcripts                                 |
-| `interval_minutes`  | `5`                       | Poll interval (min 1, max 1440)                                  |
-| `mode`              | `AUTO`                    | `AUTO` — transcribe on detection; `MANUAL` — show notification   |
-| `language_hint`     | _(empty)_                 | Optional language passed to Gemini (e.g. `Russian`)              |
-| `start_on_login`    | `false`                   | Copy autostart entry to `~/.config/autostart/`                   |
+| Field                | Default                   | Description                                                      |
+| -------------------- | ------------------------- | ---------------------------------------------------------------- |
+| `source_dir`         | `~/Videos`                | Directory to watch                                               |
+| `dest_dir`           | `~/Videos/transcripts`    | Where to save transcripts                                        |
+| `interval_minutes`   | `5`                       | Poll interval in minutes (min 1, max 1440)                       |
+| `mode`               | `AUTO`                    | `AUTO` — transcribe on detection; `MANUAL` — show notification   |
+| `language_hint`      | _(empty)_                 | Optional language passed to Gemini (e.g. `Russian`)              |
+| `start_on_login`     | `false`                   | Copy autostart entry to `~/.config/autostart/`                   |
+| `gemini_api_key`     | _(empty)_                 | Gemini API key (env var `AUTO_TRANSCRIBER_GEMINI_KEY` overrides) |
+| `move_source`        | `false`                   | Move original file to output directory after processing          |
+| `create_per_file_dir`| `false`                   | Save all artifacts for a file inside its own subdirectory        |
+| `make_keynotes`      | `false`                   | Generate a Markdown keynotes file (topic, decisions, summary)    |
+| `diarize_speakers`   | `false`                   | Label speakers in the transcript (Speaker 1, Speaker 2, …)       |
 
 ## Processing modes
 
@@ -110,7 +117,11 @@ Clicking it starts transcription; dismissing it leaves the file unprocessed unti
 Transcripts are saved as `<original_stem>.txt` in the destination directory.  
 If the file already exists a numeric suffix is added: `meeting_1.txt`, `meeting_2.txt`, …
 
-The source file is never moved, renamed, or deleted.
+If **Generate keynotes** is enabled, a `<original_stem>_keynotes.md` file is saved alongside the transcript.
+
+If **Create subdirectory per file** is enabled, both files are placed inside `<dest_dir>/<stem>/`.
+
+By default the source file is left untouched. Enable **Move source file** to move it to the output directory after processing.
 
 ## Logging
 
@@ -134,9 +145,7 @@ auto_transcriber/
 │   ├── processing.png
 │   └── error.png
 ├── requirements.txt
-├── Makefile
-└── packaging/
-    └── debian/          # Debian package metadata and scripts
+└── Makefile
 ```
 
 ## Makefile targets
