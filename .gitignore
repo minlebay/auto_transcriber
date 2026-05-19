@@ -1,0 +1,32 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Built .deb packages
+*.deb
+
+# Root-level debian symlink (points to packaging/debian)
+/debian
+
+# Debian packaging (build scripts, not needed for source distribution)
+packaging/
+
+# Debian build artifacts
+packaging/debian/auto-transcriber/
+packaging/debian/.debhelper/
+packaging/debian/debhelper-build-stamp
+packaging/debian/files
+packaging/debian/*.log
+packaging/debian/*.substvars
+packaging/debian/*.debhelper
+
+# IDE
+.idea/
+.vscode/
+*.swp
