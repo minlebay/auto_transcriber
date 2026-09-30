@@ -311,6 +311,8 @@ def main() -> None:
 
     app = QApplication(sys.argv)
     app.setApplicationName('auto-transcriber')
+    # Wayland app_id — without it windows and notifications show up as "python3"
+    app.setDesktopFileName('auto-transcriber')
     app.setQuitOnLastWindowClosed(False)
 
     if not QSystemTrayIcon.isSystemTrayAvailable():

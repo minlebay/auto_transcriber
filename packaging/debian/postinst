@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR=/opt/auto-transcriber
+VENV_DIR="$INSTALL_DIR/venv"
+PY_VER="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+
+# A venv is bound to the Python minor version it was created with: after a
+# release upgrade (e.g. 3.12 → 3.14) the new interpreter can't see the old
+# site-packages, so the venv has to be rebuilt from scratch.
+venv_is_stale() {
+    [ -d "$VENV_DIR" ] && [ ! -d "$VENV_DIR/lib/python$PY_VER" ]
+}
+
+setup_venv() {
+    if venv_is_stale; then
+        echo "System Python is now $PY_VER — rebuilding the Auto Transcriber venv…"
+        rm -rf "$VENV_DIR"
+    fi
+
+    # Create venv with access to system dbus and gi packages
+    if [ ! -d "$VENV_DIR" ]; then
+        python3 -m venv --system-site-packages "$VENV_DIR" || { rm -rf "$VENV_DIR"; return 1; }
+    fi
+
+    # Install pip dependencies
+    "$VENV_DIR/bin/pip" install --quiet --upgrade pip || return 1
+    "$VENV_DIR/bin/pip" install --quiet --upgrade \
+        -r "$INSTALL_DIR/requirements.txt" || return 1
+
+    chmod -R a+rX "$INSTALL_DIR"
+}
+
+case "$1" in
+    configure)
+        echo "Setting up Auto Transcriber Python environment…"
+        setup_venv
+        ;;
+    triggered)
+        # /usr/bin/python3 changed (see debian/triggers). Rebuild only if the
+        # minor version actually moved, and never fail the surrounding apt run.
+        if venv_is_stale; then
+            setup_venv || echo "auto-transcriber: venv rebuild failed; run 'sudo dpkg-reconfigure auto-transcriber' later." >&2
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

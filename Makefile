@@ -1,19 +1,23 @@
 PACKAGE  := auto-transcriber
-VERSION  := 1.0.0
+VERSION  := 1.0.1
 ARCH     := amd64
 DEB_FILE := $(PACKAGE)_$(VERSION)_$(ARCH).deb
 PYTHON   := venv/bin/python
+PY_VER   := $(shell python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+VENV_OK  := venv/.installed-py$(PY_VER)
 
 .PHONY: all venv gen-icons run deb build-deps clean distclean install
 
 all: gen-icons
 
-venv: venv/bin/python
+venv: $(VENV_OK)
 
-venv/bin/python:
-	python3 -m venv --system-site-packages venv
+# The venv is tied to the Python minor version; recreate it after an upgrade.
+$(VENV_OK):
+	python3 -m venv --clear --system-site-packages venv
 	venv/bin/pip install --quiet --upgrade pip
 	venv/bin/pip install --quiet -r requirements.txt
+	touch $@
 
 gen-icons: venv
 	$(PYTHON) icons/generate.py

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Auto Transcriber
+Comment=Automatic media file transcriber using Gemini AI
+Exec=/usr/bin/auto-transcriber
+Icon=auto-transcriber
+Categories=Utility;AudioVideo;
+StartupNotify=false
+NoDisplay=false

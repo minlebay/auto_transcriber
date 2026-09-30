@@ -4,7 +4,7 @@ A KUbuntu system tray application that watches a directory for audio and video f
 
 ## Features
 
-- Runs silently in the system tray (KDE / any freedesktop-compatible desktop)
+- Runs silently in the system tray (KDE / any freedesktop-compatible desktop, X11 or Wayland)
 - Watches a source directory and transcribes new files automatically
 - Two processing modes: **AUTO** (immediate) and **MANUAL** (KDE notification with action button)
 - Extracts audio from video files via `ffmpeg`
@@ -62,11 +62,23 @@ make deb
 # Install (resolves dependencies automatically)
 make install
 # or:
-sudo apt install -y ./auto-transcriber_1.0.0_amd64.deb
+sudo apt install -y ./auto-transcriber_1.0.1_amd64.deb
 ```
 
 After installation the app is available from the application menu and at `/usr/bin/auto-transcriber`.  
 Set `AUTO_TRANSCRIBER_GEMINI_KEY` in your shell profile (`.bashrc`, `.profile`, etc.) before launching.
+
+### After a system upgrade
+
+The package keeps its Python dependencies in a venv under `/opt/auto-transcriber/venv`,
+which is tied to the system Python minor version. When `python3` moves to a new version
+(e.g. Kubuntu 24.04 → 26.04, Python 3.12 → 3.14) the package rebuilds the venv automatically
+via a dpkg trigger. If that fails (e.g. no network during the upgrade), the app shows a
+notification on launch — rebuild it manually with:
+
+```bash
+sudo dpkg-reconfigure auto-transcriber
+```
 
 ## Usage
 

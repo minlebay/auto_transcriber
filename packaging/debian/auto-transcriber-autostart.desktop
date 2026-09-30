@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Auto Transcriber
+Comment=Automatic media file transcriber
+Exec=/usr/bin/auto-transcriber
+Icon=auto-transcriber
+Categories=Utility;AudioVideo;
+StartupNotify=false
+Hidden=false
+NoDisplay=false
+X-KDE-autostart-after=panel
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true

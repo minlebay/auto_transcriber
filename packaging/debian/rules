@@ -1,0 +1,54 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf packaging/debian/auto-transcriber packaging/debian/.debhelper \
+	       packaging/debian/tmp packaging/debian/debhelper-build-stamp \
+	       packaging/debian/files
+
+override_dh_auto_build:
+	python3 icons/generate.py
+
+override_dh_auto_install:
+	# App source files
+	install -d debian/auto-transcriber/opt/auto-transcriber
+	cp -r main.py watcher.py processor.py settings.py settings_dialog.py \
+	      db.py notifier.py requirements.txt \
+	      debian/auto-transcriber/opt/auto-transcriber/
+	cp -r icons debian/auto-transcriber/opt/auto-transcriber/
+
+	# Launcher script
+	install -d debian/auto-transcriber/usr/bin
+	install -m 0755 debian/auto-transcriber.launcher \
+	    debian/auto-transcriber/usr/bin/auto-transcriber
+
+	# Application .desktop
+	install -d debian/auto-transcriber/usr/share/applications
+	install -m 0644 debian/auto-transcriber.desktop \
+	    debian/auto-transcriber/usr/share/applications/
+
+	# Application icon (128x128 for hicolor theme)
+	install -d debian/auto-transcriber/usr/share/icons/hicolor/128x128/apps
+	install -m 0644 icons/idle.png \
+	    debian/auto-transcriber/usr/share/icons/hicolor/128x128/apps/auto-transcriber.png
+
+	# Autostart template (copied to ~/.config/autostart on demand via settings)
+	install -d debian/auto-transcriber/usr/share/auto-transcriber/autostart
+	install -m 0644 debian/auto-transcriber-autostart.desktop \
+	    debian/auto-transcriber/usr/share/auto-transcriber/autostart/
+
+	# System-wide autostart
+	install -d debian/auto-transcriber/etc/xdg/autostart
+	install -m 0644 debian/auto-transcriber-autostart.desktop \
+	    debian/auto-transcriber/etc/xdg/autostart/auto-transcriber.desktop
+
+override_dh_install:
+	# Files already placed by override_dh_auto_install
+
+override_dh_auto_test:
+	# No automated tests
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod 0755 debian/auto-transcriber/opt/auto-transcriber

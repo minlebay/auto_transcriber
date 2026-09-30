@@ -1,0 +1,16 @@
+auto-transcriber (1.0.1) unstable; urgency=medium
+
+  * Rebuild the venv when the system Python minor version changes
+    (postinst + dpkg trigger on /usr/bin/python3); fixes startup after
+    upgrading to Ubuntu 26.04 (Python 3.12 -> 3.14).
+  * Launcher reports a stale venv with a desktop notification.
+  * Wayland: set the desktop file name so KWin matches windows and
+    notifications to auto-transcriber.desktop.
+
+ -- Ilshat Minnibaev <ilshatminnibaev@gmail.com>  Wed, 30 Sep 2026 09:00:00 +0200
+
+auto-transcriber (1.0.0) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Ilshat Minnibaev <ilshatminnibaev@gmail.com>  Mon, 19 May 2026 00:00:00 +0500

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Launcher for Auto Transcriber.
+
+INSTALL_DIR=/opt/auto-transcriber
+VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
+
+# Autostart may run before the session environment is fully exported; fall
+# back to the first X display only when there is no Wayland display either.
+if [ -z "$WAYLAND_DISPLAY" ] && [ -z "$DISPLAY" ]; then
+    export DISPLAY=:0
+fi
+
+# venv/bin/python links to the system python3; if that moved to a new minor
+# version, the venv's packages (in lib/python3.X) are no longer importable.
+PY_NAME="$(basename "$(readlink -f "$VENV_PYTHON")")"   # e.g. python3.14
+if [ ! -x "$VENV_PYTHON" ] || [ ! -d "$INSTALL_DIR/venv/lib/$PY_NAME" ]; then
+    msg="Python environment is missing or was built for an older Python; rebuild it with: sudo dpkg-reconfigure auto-transcriber"
+    echo "auto-transcriber: $msg" >&2
+    command -v notify-send >/dev/null 2>&1 \
+        && notify-send -a "Auto Transcriber" -i auto-transcriber "Auto Transcriber can't start" "$msg"
+    exit 1
+fi
+
+cd "$INSTALL_DIR"
+exec "$VENV_PYTHON" "$INSTALL_DIR/main.py" "$@"

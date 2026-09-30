@@ -1,0 +1,21 @@
+Source: auto-transcriber
+Section: utils
+Priority: optional
+Maintainer: Ilshat Minnibaev <ilshatminnibaev@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+
+Package: auto-transcriber
+Architecture: amd64
+Depends: python3 (>= 3.10),
+         python3-pip,
+         python3-venv,
+         python3-dbus,
+         python3-gi,
+         ffmpeg
+Recommends: libnotify-bin
+Description: Automatic media file transcriber using Gemini AI
+ Watches a configurable source directory for new audio and video files,
+ extracts audio with ffmpeg, and transcribes it using the Google Gemini API.
+ Results are saved as plain-text files in a configurable output directory.
+ Runs as a KUbuntu/KDE system tray application with AUTO and MANUAL modes.
