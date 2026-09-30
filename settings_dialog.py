@@ -18,7 +18,13 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import QSize
 
-from settings import Settings
+from settings import DEFAULT_GEMINI_MODEL, GEMINI_MODELS, Settings
+
+TRAY_MONO_VARIANTS = [
+    ('Auto (match system theme)', 'auto'),
+    ('Light (for dark panels)',   'light'),
+    ('Dark (for light panels)',   'dark'),
+]
 
 
 class SettingsDialog(QDialog):
@@ -83,6 +89,13 @@ class SettingsDialog(QDialog):
         self._toggle_btn = toggle_btn
         form.addRow('Gemini API key:', api_row)
 
+        # Gemini model — editable, so a newer model id can be typed in
+        self._model = QComboBox()
+        self._model.setEditable(True)
+        self._model.addItems(GEMINI_MODELS)
+        self._model.setCurrentText(self._settings.gemini_model)
+        form.addRow('Gemini model:', self._model)
+
         # Language hint
         self._lang = QLineEdit(self._settings.language_hint)
         self._lang.setPlaceholderText('e.g. English, Russian  (optional)')
@@ -123,6 +136,30 @@ class SettingsDialog(QDialog):
         self._diarize_speakers = QCheckBox('Identify and label speakers in transcript (Speaker 1, Speaker 2, …)')
         self._diarize_speakers.setChecked(self._settings.diarize_speakers)
         form.addRow('', self._diarize_speakers)
+
+        # Tray icon
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.Shape.HLine)
+        sep3.setFrameShadow(QFrame.Shadow.Sunken)
+        form.addRow(sep3)
+        form.addRow(QLabel('<b>Tray icon</b>'))
+
+        self._tray_mono = QCheckBox('Monochrome')
+        self._tray_mono.setChecked(self._settings.tray_monochrome)
+        self._tray_mono_variant = QComboBox()
+        for label, value in TRAY_MONO_VARIANTS:
+            self._tray_mono_variant.addItem(label, value)
+        idx = self._tray_mono_variant.findData(self._settings.tray_mono_variant)
+        self._tray_mono_variant.setCurrentIndex(max(idx, 0))
+        self._tray_mono_variant.setEnabled(self._settings.tray_monochrome)
+        self._tray_mono.toggled.connect(self._tray_mono_variant.setEnabled)
+        mono_row = QHBoxLayout()
+        mono_row.setContentsMargins(0, 0, 0, 0)
+        mono_row.addWidget(self._tray_mono)
+        mono_row.addWidget(QLabel('Color:'))
+        mono_row.addWidget(self._tray_mono_variant)
+        mono_row.addStretch()
+        form.addRow('Style:', mono_row)
 
         layout.addLayout(form)
 
@@ -177,8 +214,11 @@ class SettingsDialog(QDialog):
             language_hint=self._lang.text().strip(),
             start_on_login=self._autostart.isChecked(),
             gemini_api_key='' if os.environ.get('AUTO_TRANSCRIBER_GEMINI_KEY') else self._api_key.text().strip(),
+            gemini_model=self._model.currentText().strip() or DEFAULT_GEMINI_MODEL,
             move_source=self._move_source.isChecked(),
             create_per_file_dir=self._create_per_file_dir.isChecked(),
             make_keynotes=self._make_keynotes.isChecked(),
             diarize_speakers=self._diarize_speakers.isChecked(),
+            tray_monochrome=self._tray_mono.isChecked(),
+            tray_mono_variant=self._tray_mono_variant.currentData(),
         )

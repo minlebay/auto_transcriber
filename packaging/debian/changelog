@@ -1,3 +1,17 @@
+auto-transcriber (1.0.2) unstable; urgency=medium
+
+  * Switch from the deprecated google-generativeai SDK to google-genai
+    (still uploads audio through the File API, so long recordings work).
+    postinst removes google-generativeai from the existing venv.
+  * Default model is now gemini-3.5-flash; the model can be chosen in
+    Settings (gemini-3.5/3.6/3.7/3.8-flash or any typed-in model id).
+  * New tray icon: sound wave turning into text; the state is shown by
+    shape (lines / dots / cross) and the icon is drawn at every tray size.
+  * Optional monochrome tray icon that follows the KDE light/dark color
+    scheme (or a fixed light/dark glyph), configurable in Settings.
+
+ -- Ilshat Minnibaev <ilshatminnibaev@gmail.com>  Wed, 30 Sep 2026 09:05:37 +0200
+
 auto-transcriber (1.0.1) unstable; urgency=medium
 
   * Rebuild the venv when the system Python minor version changes

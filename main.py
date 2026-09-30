@@ -18,8 +18,7 @@ try:
 except Exception:
     pass  # dbus not available; MANUAL mode will degrade gracefully
 
-from PySide6.QtCore import QObject, QRect, QThread, QTimer, Signal, Slot
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 from PySide6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon
 
 import settings as settings_module
@@ -28,44 +27,10 @@ from notifier import Notifier
 from processor import ProcessorWorker
 from settings import Settings, setup_logging
 from settings_dialog import SettingsDialog
+from tray_icon import make_tray_icon
 from watcher import Watcher
 
 log = logging.getLogger(__name__)
-
-# Equalizer-bar icon specs: (color_hex, bar_heights_from_bottom)
-_ICON_SPECS: dict[str, tuple[str, list[int]]] = {
-    'idle':       ('#4A90D9', [6, 10, 14, 10, 6]),   # bell curve, blue — resting
-    'processing': ('#F5A623', [14, 7, 17, 5, 12]),   # irregular, amber — active
-    'error':      ('#E74C3C', [3, 3, 3, 3, 3]),      # flatline, red — failed
-}
-
-_BAR_W  = 3
-_GAP    = 1
-_N_BARS = 5
-_SIZE   = 22
-_BOTTOM = _SIZE - 3   # bottom edge row
-
-
-def _make_icon(state: str) -> QIcon:
-    color_hex, heights = _ICON_SPECS[state]
-    total_w = _N_BARS * _BAR_W + (_N_BARS - 1) * _GAP
-    left = (_SIZE - total_w) // 2
-
-    pix = QPixmap(_SIZE, _SIZE)
-    pix.fill(QColor(0, 0, 0, 0))
-    p = QPainter(pix)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setBrush(QColor(color_hex))
-    p.setPen(QColor(0, 0, 0, 0))
-
-    for i, h in enumerate(heights):
-        x = left + i * (_BAR_W + _GAP)
-        y = _BOTTOM - h + 1
-        p.drawRoundedRect(QRect(x, y, _BAR_W, h), 1, 1)
-
-    p.end()
-    return QIcon(pix)
-
 
 class TrayApp(QSystemTrayIcon):
     # Signal used to send work to the ProcessorWorker (lives in a QThread).
@@ -80,6 +45,7 @@ class TrayApp(QSystemTrayIcon):
         self._watcher  = Watcher(db)
         self._queue: list[str] = []
         self._is_processing    = False
+        self._state            = 'idle'
 
         self._ffmpeg_ok  = shutil.which('ffmpeg') is not None
         self._api_key_ok = bool(cfg.effective_api_key())
@@ -97,6 +63,8 @@ class TrayApp(QSystemTrayIcon):
         self._set_state('idle')
         self._build_menu()
         self.show()
+        # "auto" monochrome follows the system light/dark scheme
+        QApplication.instance().styleHints().colorSchemeChanged.connect(self._refresh_icon)
 
         # Warn about missing dependencies
         if not self._ffmpeg_ok:
@@ -154,13 +122,26 @@ class TrayApp(QSystemTrayIcon):
     # ------------------------------------------------------------------
 
     def _set_state(self, state: str) -> None:
-        self.setIcon(_make_icon(state))
+        self._state = state
+        self._refresh_icon()
         labels = {
             'idle':       'Auto Transcriber — Idle',
             'processing': 'Auto Transcriber — Processing…',
             'error':      'Auto Transcriber — Error',
         }
         self.setToolTip(labels[state])
+
+    def _refresh_icon(self, *_args) -> None:
+        self.setIcon(make_tray_icon(
+            self._state,
+            monochrome=self._cfg.tray_monochrome,
+            mono_variant=self._cfg.tray_mono_variant,
+        ))
+
+    def _clear_error(self) -> None:
+        # The next file may already be processing by the time this fires.
+        if self._state == 'error':
+            self._set_state('idle')
 
     # ------------------------------------------------------------------
     # Polling
@@ -206,6 +187,7 @@ class TrayApp(QSystemTrayIcon):
             'dest_dir':            self._cfg.dest_dir,
             'language_hint':       self._cfg.language_hint,
             'gemini_api_key':      self._cfg.effective_api_key(),
+            'gemini_model':        self._cfg.gemini_model,
             'move_source':         self._cfg.move_source,
             'create_per_file_dir': self._cfg.create_per_file_dir,
             'make_keynotes':       self._cfg.make_keynotes,
@@ -246,7 +228,7 @@ class TrayApp(QSystemTrayIcon):
             QSystemTrayIcon.MessageIcon.Critical, 7000,
         )
         log.error('Failed: %s — %s', source_path, error_msg)
-        QTimer.singleShot(6000, lambda: self._set_state('idle'))
+        QTimer.singleShot(6000, self._clear_error)
         self._process_next()
 
     @Slot(str)
@@ -287,6 +269,7 @@ class TrayApp(QSystemTrayIcon):
                 self._cfg.apply_autostart()
             if self._cfg.interval_minutes != old_interval:
                 self._apply_interval()
+            self._refresh_icon()
 
     def _show_log(self) -> None:
         log_path = settings_module.LOG_FILE

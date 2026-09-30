@@ -8,12 +8,13 @@ A KUbuntu system tray application that watches a directory for audio and video f
 - Watches a source directory and transcribes new files automatically
 - Two processing modes: **AUTO** (immediate) and **MANUAL** (KDE notification with action button)
 - Extracts audio from video files via `ffmpeg`
-- Transcribes with `gemini-2.5-flash` via the Gemini File API
+- Transcribes with Gemini (`gemini-3.5-flash` by default, selectable in Settings) via the Gemini File API
 - Optional speaker diarization (labels Speaker 1, Speaker 2, …)
 - Optional keynotes generation (participants, topic, decisions, summary)
 - Skips files that are still being written (size-stability check)
 - Tracks processed files in SQLite — no duplicate work on restart
 - Rotating log file, configurable poll interval, optional language hint
+- Optional monochrome tray icon that follows the KDE light/dark color scheme
 
 ## Supported formats
 
@@ -62,7 +63,7 @@ make deb
 # Install (resolves dependencies automatically)
 make install
 # or:
-sudo apt install -y ./auto-transcriber_1.0.1_amd64.deb
+sudo apt install -y ./auto-transcriber_1.0.2_amd64.deb
 ```
 
 After installation the app is available from the application menu and at `/usr/bin/auto-transcriber`.  
@@ -91,13 +92,20 @@ Right-click the tray icon to access the menu:
 | **Show Log**    | Open the log file with the default viewer   |
 | **Quit**        | Exit the application                        |
 
-### Icon colors
+### Tray icon
 
-| Color  | Meaning                                              |
-| ------ | ---------------------------------------------------- |
-| Blue   | Idle — waiting for the next poll                     |
-| Amber  | Processing a file                                    |
-| Red    | Last file failed (resets to blue after a few seconds)|
+The icon is a short sound wave followed by what it turns into; the right half shows the state:
+
+| Shape            | Color | Meaning                                                |
+| ---------------- | ----- | ------------------------------------------------------ |
+| Wave + lines     | Blue  | Idle — waiting for the next poll                       |
+| Wave + dots      | Amber | Processing a file                                      |
+| Wave + cross     | Red   | Last file failed (resets to idle after a few seconds)  |
+
+With **Settings → Tray icon → Monochrome** the icon is drawn in a single color, like the
+symbolic icons of the Plasma panel. **Auto** picks a light or dark glyph from the current
+KDE color scheme and switches when the scheme changes; **Light** / **Dark** fix it (useful
+when the panel and the application color schemes differ).
 
 ## Configuration
 
@@ -112,10 +120,13 @@ Settings are stored in `~/.config/auto_transcriber/config.json`.
 | `language_hint`      | _(empty)_                 | Optional language passed to Gemini (e.g. `Russian`)              |
 | `start_on_login`     | `false`                   | Copy autostart entry to `~/.config/autostart/`                   |
 | `gemini_api_key`     | _(empty)_                 | Gemini API key (env var `AUTO_TRANSCRIBER_GEMINI_KEY` overrides) |
+| `gemini_model`       | `gemini-3.5-flash`        | Gemini model id (`gemini-3.6-flash`, `gemini-3.7-flash`, `gemini-3.8-flash`, …) |
 | `move_source`        | `false`                   | Move original file to output directory after processing          |
 | `create_per_file_dir`| `false`                   | Save all artifacts for a file inside its own subdirectory        |
 | `make_keynotes`      | `false`                   | Generate a Markdown keynotes file (topic, decisions, summary)    |
 | `diarize_speakers`   | `false`                   | Label speakers in the transcript (Speaker 1, Speaker 2, …)       |
+| `tray_monochrome`    | `false`                   | Single-color tray icon                                           |
+| `tray_mono_variant`  | `auto`                    | `auto` (follow color scheme), `light` (dark panels), `dark` (light panels) |
 
 ## Processing modes
 
@@ -151,8 +162,9 @@ auto_transcriber/
 ├── settings_dialog.py   # QDialog for the Settings menu item
 ├── db.py                # SQLite tracker (processed files)
 ├── notifier.py          # D-Bus notification wrapper (MANUAL mode)
+├── tray_icon.py         # Tray icon glyph (colored / monochrome)
 ├── icons/
-│   ├── generate.py      # Generates idle/processing/error PNGs
+│   ├── generate.py      # Generates idle/processing/error PNGs (application icon)
 │   ├── idle.png
 │   ├── processing.png
 │   └── error.png
@@ -167,16 +179,16 @@ auto_transcriber/
 | `make build-deps`   | Install `debhelper` (needed once for .deb) |
 | `make gen-icons`    | Generate PNG icons                         |
 | `make run`          | Run from source (creates venv if needed)   |
-| `make deb`          | Build `auto-transcriber_1.0.0_amd64.deb`   |
+| `make deb`          | Build `auto-transcriber_1.0.2_amd64.deb`   |
 | `make install`      | `sudo apt install` the built package       |
 | `make clean`        | Remove build artifacts and icons           |
 | `make distclean`    | `clean` + remove venv and debian symlink   |
 
 ## Dependencies (pip)
 
-| Package                      | Purpose                                     |
-| ---------------------------- | ------------------------------------------- |
-| `PySide6 >= 6.6`             | Qt bindings — tray icon, dialogs, threading |
-| `google-generativeai >= 0.7` | Gemini API client                           |
+| Package               | Purpose                                     |
+| --------------------- | ------------------------------------------- |
+| `PySide6 >= 6.6`      | Qt bindings — tray icon, dialogs, threading |
+| `google-genai >= 1.0` | Gemini API client (Google Gen AI SDK)       |
 
 `dbus-python` and `python3-gi` are expected as system packages and are not installed via pip.

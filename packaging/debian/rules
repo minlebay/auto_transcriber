@@ -14,7 +14,7 @@ override_dh_auto_install:
 	# App source files
 	install -d debian/auto-transcriber/opt/auto-transcriber
 	cp -r main.py watcher.py processor.py settings.py settings_dialog.py \
-	      db.py notifier.py requirements.txt \
+	      db.py notifier.py tray_icon.py requirements.txt \
 	      debian/auto-transcriber/opt/auto-transcriber/
 	cp -r icons debian/auto-transcriber/opt/auto-transcriber/
 

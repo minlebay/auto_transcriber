@@ -1,5 +1,5 @@
 PACKAGE  := auto-transcriber
-VERSION  := 1.0.1
+VERSION  := 1.0.2
 ARCH     := amd64
 DEB_FILE := $(PACKAGE)_$(VERSION)_$(ARCH).deb
 PYTHON   := venv/bin/python
@@ -13,7 +13,9 @@ all: gen-icons
 venv: $(VENV_OK)
 
 # The venv is tied to the Python minor version; recreate it after an upgrade.
-$(VENV_OK):
+# Also rebuilt from scratch when requirements.txt changes, so dropped
+# packages don't linger in it.
+$(VENV_OK): requirements.txt
 	python3 -m venv --clear --system-site-packages venv
 	venv/bin/pip install --quiet --upgrade pip
 	venv/bin/pip install --quiet -r requirements.txt

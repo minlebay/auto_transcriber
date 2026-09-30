@@ -14,6 +14,17 @@ DB_FILE       = CONFIG_DIR / 'processed.db'
 AUTOSTART_DST = Path.home() / '.config' / 'autostart' / 'auto-transcriber.desktop'
 AUTOSTART_SRC = Path('/usr/share/auto-transcriber/autostart/auto-transcriber-autostart.desktop')
 
+DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash'
+# Offered in the Settings combo box (newest first); any other model id can be typed in.
+GEMINI_MODELS = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+]
+
+TRAY_MONO_VARIANTS = ('auto', 'light', 'dark')
+
 DEFAULTS = {
     'source_dir':          str(Path.home() / 'Videos'),
     'dest_dir':            str(Path.home() / 'Videos' / 'transcripts'),
@@ -22,10 +33,13 @@ DEFAULTS = {
     'language_hint':       '',
     'start_on_login':      False,
     'gemini_api_key':      '',
+    'gemini_model':        DEFAULT_GEMINI_MODEL,
     'move_source':         False,
     'create_per_file_dir': False,
     'make_keynotes':       False,
     'diarize_speakers':    False,
+    'tray_monochrome':     False,
+    'tray_mono_variant':   'auto',
 }
 
 AUTOSTART_DESKTOP = """\
@@ -53,10 +67,13 @@ class Settings:
     language_hint:       str
     start_on_login:      bool
     gemini_api_key:      str   # stored in config; env var AUTO_TRANSCRIBER_GEMINI_KEY takes precedence
+    gemini_model:        str   # model id passed to generate_content
     move_source:         bool  # move original file to dest dir after processing
     create_per_file_dir: bool  # put artifacts in dest_dir/<stem>/ subdir
     make_keynotes:       bool  # generate summary (participants, topic, agreements)
     diarize_speakers:    bool  # label speakers in transcript
+    tray_monochrome:     bool  # single-color tray glyph instead of the colored one
+    tray_mono_variant:   str   # 'auto' (follow color scheme) | 'light' (dark panels) | 'dark' (light panels)
 
     @classmethod
     def load(cls) -> 'Settings':
@@ -75,10 +92,13 @@ class Settings:
             language_hint=str(data['language_hint']),
             start_on_login=bool(data['start_on_login']),
             gemini_api_key=str(data.get('gemini_api_key', '')),
+            gemini_model=str(data.get('gemini_model', '')).strip() or DEFAULT_GEMINI_MODEL,
             move_source=bool(data.get('move_source', False)),
             create_per_file_dir=bool(data.get('create_per_file_dir', False)),
             make_keynotes=bool(data.get('make_keynotes', False)),
             diarize_speakers=bool(data.get('diarize_speakers', False)),
+            tray_monochrome=bool(data.get('tray_monochrome', False)),
+            tray_mono_variant=data['tray_mono_variant'] if data['tray_mono_variant'] in TRAY_MONO_VARIANTS else 'auto',
         )
 
     def effective_api_key(self) -> str:
@@ -122,3 +142,7 @@ def setup_logging() -> None:
     console.setLevel(logging.INFO)
     console.setFormatter(logging.Formatter('%(levelname)-8s %(message)s'))
     root.addHandler(console)
+
+    # The Gemini SDK talks HTTP through httpx; httpcore's per-connection DEBUG
+    # lines would add ~80 lines to the log for every processed file.
+    logging.getLogger('httpcore').setLevel(logging.INFO)

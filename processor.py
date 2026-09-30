@@ -8,7 +8,42 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot
 
+from settings import DEFAULT_GEMINI_MODEL
+
 log = logging.getLogger(__name__)
+
+
+def _gemini_client(snap: dict):
+    from google import genai
+
+    api_key = os.environ.get('AUTO_TRANSCRIBER_GEMINI_KEY', '') or snap.get('gemini_api_key', '')
+    if not api_key:
+        raise RuntimeError(
+            'Gemini API key is not set.\n'
+            'Add it in Settings or set AUTO_TRANSCRIBER_GEMINI_KEY in your environment.'
+        )
+    return genai.Client(api_key=api_key)
+
+
+def _generate_text(client, snap: dict, contents) -> str:
+    from google.genai import errors, types
+
+    model = snap.get('gemini_model') or DEFAULT_GEMINI_MODEL
+    # No tools are passed; disabling automatic function calling also stops the
+    # SDK from logging an "AFC is not recommended" warning on every start.
+    config = types.GenerateContentConfig(
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+    )
+    try:
+        response = client.models.generate_content(model=model, contents=contents, config=config)
+    except errors.APIError as exc:
+        if exc.code == 429:
+            raise RuntimeError('Gemini quota exceeded — try again later') from exc
+        raise
+    # .text is None when the model returned no text part (e.g. blocked output)
+    if not response.text:
+        raise RuntimeError(f'Gemini ({model}) returned an empty response')
+    return response.text.strip()
 
 
 class ProcessorWorker(QObject):
@@ -79,33 +114,23 @@ class ProcessorWorker(QObject):
             raise RuntimeError(f'ffmpeg error (rc={result.returncode}): {stderr}')
 
     def _transcribe(self, wav_path: str, snap: dict) -> str:
-        import google.generativeai as genai
-        try:
-            from google.api_core.exceptions import ResourceExhausted
-        except ImportError:
-            ResourceExhausted = Exception  # type: ignore[assignment,misc]
+        from google.genai import types
 
-        api_key = os.environ.get('AUTO_TRANSCRIBER_GEMINI_KEY', '') or snap.get('gemini_api_key', '')
-        if not api_key:
-            raise RuntimeError(
-                'Gemini API key is not set.\n'
-                'Add it in Settings or set AUTO_TRANSCRIBER_GEMINI_KEY in your environment.'
-            )
-
-        genai.configure(api_key=api_key)
+        client = _gemini_client(snap)
 
         log.debug('Uploading %s to Gemini File API', wav_path)
-        audio_file = genai.upload_file(path=wav_path, mime_type='audio/wav')
+        audio_file = client.files.upload(
+            file=wav_path, config=types.UploadFileConfig(mime_type='audio/wav'),
+        )
 
         try:
             for _ in range(90):
-                state = audio_file.state.name
-                if state == 'ACTIVE':
+                if audio_file.state == types.FileState.ACTIVE:
                     break
-                if state == 'FAILED':
+                if audio_file.state == types.FileState.FAILED:
                     raise RuntimeError('Gemini file upload failed (state=FAILED)')
                 time.sleep(1)
-                audio_file = genai.get_file(audio_file.name)
+                audio_file = client.files.get(name=audio_file.name)
             else:
                 raise RuntimeError('Gemini file upload timed out (90 s)')
 
@@ -130,18 +155,12 @@ class ProcessorWorker(QObject):
                     f'Return plain text only.{lang_clause}'
                 )
 
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            try:
-                response = model.generate_content([audio_file, prompt])
-            except ResourceExhausted:
-                raise RuntimeError('Gemini quota exceeded — try again later')
-
-            return response.text.strip()
+            return _generate_text(client, snap, [audio_file, prompt])
         finally:
             try:
-                genai.delete_file(audio_file.name)
+                client.files.delete(name=audio_file.name)
             except Exception:
-                pass
+                log.warning('Could not delete Gemini file %s', audio_file.name, exc_info=True)
 
     def _save_transcript(self, src: Path, dest: Path, text: str) -> str:
         out = dest / f'{src.stem}.txt'
@@ -154,14 +173,7 @@ class ProcessorWorker(QObject):
         return str(out)
 
     def _save_keynotes(self, src: Path, dest: Path, transcript: str, snap: dict) -> None:
-        import google.generativeai as genai
-        try:
-            from google.api_core.exceptions import ResourceExhausted
-        except ImportError:
-            ResourceExhausted = Exception  # type: ignore[assignment,misc]
-
-        api_key = os.environ.get('AUTO_TRANSCRIBER_GEMINI_KEY', '') or snap.get('gemini_api_key', '')
-        genai.configure(api_key=api_key)
+        client = _gemini_client(snap)
 
         lang_clause = ''
         raw_hint = snap.get('language_hint', '')
@@ -185,13 +197,7 @@ class ProcessorWorker(QObject):
             f'{transcript[:30000]}'
         )
 
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        try:
-            response = model.generate_content(prompt)
-        except ResourceExhausted:
-            raise RuntimeError('Gemini quota exceeded — try again later')
-
-        keynotes_text = response.text.strip()
+        keynotes_text = _generate_text(client, snap, prompt)
         out = dest / f'{src.stem}_keynotes.md'
         counter = 1
         while out.exists():

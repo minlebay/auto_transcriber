@@ -23,6 +23,13 @@ setup_venv() {
         python3 -m venv --system-site-packages "$VENV_DIR" || { rm -rf "$VENV_DIR"; return 1; }
     fi
 
+    # google-generativeai was replaced by google-genai in 1.0.2; `pip install
+    # --upgrade -r` never removes anything, so drop it explicitly. Best effort:
+    # a leftover package is harmless, a failed postinst is not.
+    if "$VENV_DIR/bin/pip" show --quiet google-generativeai >/dev/null 2>&1; then
+        "$VENV_DIR/bin/pip" uninstall --quiet -y google-generativeai || true
+    fi
+
     # Install pip dependencies
     "$VENV_DIR/bin/pip" install --quiet --upgrade pip || return 1
     "$VENV_DIR/bin/pip" install --quiet --upgrade \
